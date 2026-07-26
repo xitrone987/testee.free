@@ -1,91 +1,10 @@
 --[[
-    Cerberus Loader - Versão Livre Completa (UI Garantida)
-    Todas as funcionalidades premium desbloqueadas
-    UI forçada a aparecer em qualquer executor
+    Cerberus Loader - Versão Livre (UI Recriada)
+    Sistema próprio de carregamento, sem travas
 ]]
 
--- FORÇA A UI A APARECER
-local function forcarUI()
-    -- Tenta diferentes métodos para criar a UI
-    local sucesso, gui = pcall(function()
-        -- Método 1: CoreGui
-        return game:GetService("CoreGui")
-    end)
-    
-    if not sucesso or not gui then
-        -- Método 2: PlayerGui
-        pcall(function()
-            gui = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
-        end)
-    end
-    
-    if not gui then
-        -- Método 3: Criar um novo ScreenGui direto
-        pcall(function()
-            gui = Instance.new("ScreenGui")
-            gui.Parent = game:GetService("CoreGui")
-        end)
-    end
-    
-    return gui
-end
-
--- Remove UIs antigas do Cerberus
-local function limparUI()
-    pcall(function()
-        local coreGui = game:GetService("CoreGui")
-        for _, child in ipairs(coreGui:GetChildren()) do
-            if child:IsA("ScreenGui") and child.Name == "CerberusLoaderGui" then
-                child:Destroy()
-            end
-        end
-    end)
-    
-    pcall(function()
-        local player = game:GetService("Players").LocalPlayer
-        if player then
-            local playerGui = player:FindFirstChildOfClass("PlayerGui")
-            if playerGui then
-                for _, child in ipairs(playerGui:GetChildren()) do
-                    if child:IsA("ScreenGui") and child.Name == "CerberusLoaderGui" then
-                        child:Destroy()
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- Executa a limpeza
-limparUI()
-
--- Força a criação da UI
-local CoreGui = forcarUI()
-
--- Se ainda não tiver CoreGui, cria um
-if not CoreGui then
-    CoreGui = Instance.new("ScreenGui")
-    CoreGui.Name = "CerberusLoaderGui"
-    CoreGui.Parent = game:GetService("CoreGui")
-    CoreGui.ResetOnSpawn = false
-    CoreGui.IgnoreGuiInset = true
-    CoreGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    CoreGui.DisplayOrder = 999999
-end
-
-local a = game:GetService("UserInputService")
-local b = game:GetService("TweenService")
-local c = game:GetService("Players")
-local d = CoreGui -- Usa o CoreGui que criamos
-
--- URLs dos scripts
-local e = "https://raw.githubusercontent.com/safetrademarketplace/scripts/refs/heads/main/"
-local f = "https://api.luarmor.net/files/v4/loaders/1acad587672d96c8afb9c5bbc36bf921.lua"
-local g = "https://getcerberus.com/discord"
-local h = "rbxassetid://136497541793809"
-
--- Cores do tema
-local i = {
+-- ===== CONFIGURAÇÕES =====
+local CORES = {
     bg = Color3.fromRGB(12,15,21),
     surface = Color3.fromRGB(20,25,33),
     surface2 = Color3.fromRGB(27,33,43),
@@ -101,8 +20,11 @@ local i = {
     white = Color3.fromRGB(255,255,255)
 }
 
+local BASE_URL = "https://raw.githubusercontent.com/safetrademarketplace/scripts/refs/heads/main/"
+local UNIVERSAL_URL = "https://api.luarmor.net/files/v4/loaders/1acad587672d96c8afb9c5bbc36bf921.lua"
+
 -- Mapeamento de jogos
-local j = {
+local GAME_SCRIPTS = {
     ["3764534614"] = "runeSlayer.lua",
     ["6115988515"] = "animeSaga.lua",
     ["7095682825"] = "beaks.lua",
@@ -181,263 +103,179 @@ local j = {
     ["1511883870"] = "shindoLife.lua"
 }
 
--- Scripts gratuitos
-local k = {
-    ["animeExpeditions.lua"] = true,
-    ["gag2.lua"] = true,
-    ["slime.lua"] = true,
-    ["deepwoken.lua"] = true,
-    ["sellLemons.lua"] = true,
-    ["animalHospital.lua"] = true,
-    ["animeWarriors3.lua"] = true,
-    ["bbn.lua"] = true,
-    ["shindoLife.lua"] = true
-}
+-- ===== SERVIÇOS =====
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
 
--- Funções auxiliares
-local function q(tipo, props)
-    local obj = Instance.new(tipo)
+-- ===== FUNÇÕES AUXILIARES =====
+local function criar(className, props)
+    local obj = Instance.new(className)
     if props then
-        for prop, valor in pairs(props) do
-            if prop ~= "Parent" then
-                obj[prop] = valor
-            end
+        for k, v in pairs(props) do
+            if k ~= "Parent" then obj[k] = v end
         end
-        if props.Parent then
-            obj.Parent = props.Parent
-        end
+        if props.Parent then obj.Parent = props.Parent end
     end
     return obj
 end
 
-local function r(duracao, estilo, direcao)
-    return TweenInfo.new(
-        duracao,
-        estilo or Enum.EasingStyle.Quad,
-        direcao or Enum.EasingDirection.Out
-    )
+local function tween(obj, duration, style, direction, props)
+    local info = TweenInfo.new(duration, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out)
+    local t = TweenService:Create(obj, info, props)
+    t:Play()
+    return t
 end
 
-local function s(obj, info, props)
-    local tween = b:Create(obj, info, props)
-    tween:Play()
-    return tween
+local function roundCorner(obj, radius)
+    return criar("UICorner", { CornerRadius = UDim.new(0, radius), Parent = obj })
 end
 
-local function borda(obj, raio)
-    return q("UICorner", {
-        CornerRadius = UDim.new(0, raio),
-        Parent = obj
-    })
-end
-
-local function contorno(obj, cor, transparencia, espessura)
-    return q("UIStroke", {
-        Color = cor,
-        Transparency = transparencia or 0,
-        Thickness = espessura or 1,
+local function stroke(obj, color, transparency, thickness)
+    return criar("UIStroke", {
+        Color = color,
+        Transparency = transparency or 0,
+        Thickness = thickness or 1,
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
         Parent = obj
     })
 end
 
-local function gradiente(obj, cor1, cor2, rotacao)
-    return q("UIGradient", {
-        Color = ColorSequence.new(cor1, cor2),
-        Rotation = rotacao or 0,
-        Parent = obj
-    })
-end
-
-local function texto(props)
+local function label(props)
     local obj = Instance.new("TextLabel")
     obj.BackgroundTransparency = 1
     obj.FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Medium)
-    obj.TextColor3 = i.text
+    obj.TextColor3 = CORES.text
     obj.TextSize = 13
     obj.TextXAlignment = Enum.TextXAlignment.Left
-    for prop, valor in pairs(props) do
-        if prop ~= "Parent" then
-            obj[prop] = valor
-        end
+    for k, v in pairs(props) do
+        if k ~= "Parent" then obj[k] = v end
     end
-    if props.Parent then
-        obj.Parent = props.Parent
-    end
+    if props.Parent then obj.Parent = props.Parent end
     return obj
 end
 
-local function obterGui()
-    -- Tenta CoreGui primeiro
-    local sucesso, resultado = pcall(function()
-        return game:GetService("CoreGui")
-    end)
-    if sucesso and resultado then
-        return resultado
-    end
-    
-    -- Tenta PlayerGui
-    pcall(function()
-        local player = c.LocalPlayer
-        if player then
-            resultado = player:FindFirstChildOfClass("PlayerGui")
-            if resultado then return resultado end
-        end
-    end)
-    
-    -- Fallback: cria um ScreenGui
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "CerberusLoaderGui"
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.DisplayOrder = 999999
-    
-    pcall(function()
-        gui.Parent = game:GetService("CoreGui")
-    end)
-    
-    if not gui.Parent then
-        pcall(function()
-            local player = c.LocalPlayer
-            if player then
-                local playerGui = player:FindFirstChildOfClass("PlayerGui")
-                if playerGui then
-                    gui.Parent = playerGui
-                end
-            end
-        end)
-    end
-    
-    return gui
-end
-
 local function formatarNome(nome)
-    local nome = (nome or ""):gsub("%.lua$", "")
+    nome = (nome or ""):gsub("%.lua$", "")
     nome = nome:gsub("(%l)(%u)", "%1 %2"):gsub("(%u)(%u%l)", "%1 %2")
     if #nome == 0 then return "Cerberus" end
     return nome:sub(1,1):upper() .. nome:sub(2)
 end
 
--- CLASSE PRINCIPAL
-local Loader = {}
-Loader.__index = Loader
-
-function Loader.new()
-    local gui = obterGui()
+local function obterGUI()
+    local success, result = pcall(function() return CoreGui end)
+    if success and result then return result end
     
-    -- Remove UI existente
-    pcall(function()
-        if gui then
-            local existente = gui:FindFirstChild("CerberusLoaderGui")
-            if existente then existente:Destroy() end
-        end
-    end)
-
-    local self = setmetatable({
-        conexoes = {},
-        sweepTween = nil,
-        pulseTween = nil
-    }, Loader)
-
-    -- Criar GUI principal
-    local screenGui = q("ScreenGui", {
-        Name = "CerberusLoaderGui",
+    local player = Players.LocalPlayer
+    if player then
+        local gui = player:FindFirstChildOfClass("PlayerGui")
+        if gui then return gui end
+    end
+    
+    local newGui = criar("ScreenGui", {
+        Name = "CerberusLoader",
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         DisplayOrder = 999999
     })
+    pcall(function() newGui.Parent = CoreGui end)
+    if not newGui.Parent then
+        pcall(function()
+            local player = Players.LocalPlayer
+            if player then
+                local pg = player:FindFirstChildOfClass("PlayerGui")
+                if pg then newGui.Parent = pg end
+            end
+        end)
+    end
+    return newGui
+end
+
+-- ===== CLASSE LOADER =====
+local Loader = {}
+Loader.__index = Loader
+
+function Loader.new()
+    local self = setmetatable({ conexoes = {}, pulseTween = nil }, Loader)
     
-    -- Tenta proteger a GUI
+    -- Limpa UIs antigas
     pcall(function()
-        if syn and syn.protect_gui then
-            syn.protect_gui(screenGui)
-        elseif protectgui then
-            protectgui(screenGui)
+        for _, child in ipairs(CoreGui:GetChildren()) do
+            if child:IsA("ScreenGui") and child.Name == "CerberusLoader" then
+                child:Destroy()
+            end
         end
     end)
     
-    -- Define o parente
-    if gui then
-        screenGui.Parent = gui
-    else
-        -- Fallback extremo
-        pcall(function()
-            screenGui.Parent = game:GetService("CoreGui")
-        end)
-        if not screenGui.Parent then
-            pcall(function()
-                local player = c.LocalPlayer
-                if player then
-                    local playerGui = player:FindFirstChildOfClass("PlayerGui")
-                    if playerGui then
-                        screenGui.Parent = playerGui
-                    end
-                end
-            end)
-        end
+    local guiParent = obterGUI()
+    if not guiParent then
+        guiParent = criar("ScreenGui", { Name = "CerberusLoader", Parent = CoreGui })
     end
     
-    -- Se ainda não tiver parente, cria um CoreGui novo
-    if not screenGui.Parent then
-        local novoGui = Instance.new("ScreenGui")
-        novoGui.Name = "CerberusLoaderGui"
-        novoGui.Parent = game:GetService("CoreGui")
-        screenGui = novoGui
-    end
+    local screenGui = criar("ScreenGui", {
+        Name = "CerberusLoader",
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+        DisplayOrder = 999999,
+        Parent = guiParent
+    })
+    
+    pcall(function()
+        if syn and syn.protect_gui then syn.protect_gui(screenGui)
+        elseif protectgui then protectgui(screenGui) end
+    end)
     
     self.gui = screenGui
-
+    
     -- Container principal
-    local largura, altura = 460, 300
-    local holder = q("Frame", {
+    local W, H = 460, 300
+    local holder = criar("Frame", {
         BackgroundTransparency = 1,
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(largura, altura),
+        Size = UDim2.fromOffset(W, H),
         Parent = screenGui
     })
     self.holder = holder
     
-    local scale = q("UIScale", {
-        Scale = 0.94,
-        Parent = holder
-    })
+    local scale = criar("UIScale", { Scale = 0.94, Parent = holder })
     self.scale = scale
-
-    -- Janela principal
-    local win = q("CanvasGroup", {
-        BackgroundColor3 = i.bg,
+    
+    -- Janela
+    local win = criar("CanvasGroup", {
+        BackgroundColor3 = CORES.bg,
         GroupTransparency = 1,
         Size = UDim2.fromScale(1, 1),
         ZIndex = 1,
         Parent = holder
     })
-    borda(win, 16)
-    contorno(win, i.white, 0.9)
+    roundCorner(win, 16)
+    stroke(win, CORES.white, 0.9)
     self.win = win
-
-    -- HEADER
-    local header = q("Frame", {
+    
+    -- Header
+    local header = criar("Frame", {
         BackgroundTransparency = 1,
         Active = true,
         Size = UDim2.new(1, 0, 0, 56),
         Parent = win
     })
     self.header = header
-
-    -- Ícone do header
-    local dot = q("Frame", {
-        BackgroundColor3 = i.accent,
+    
+    -- Dot
+    local dot = criar("Frame", {
+        BackgroundColor3 = CORES.accent,
         Position = UDim2.fromOffset(22, 25),
         Size = UDim2.fromOffset(8, 8),
         Parent = header
     })
-    borda(dot, 4)
-
+    roundCorner(dot, 4)
+    
     -- Título
-    local titulo = texto({
+    local title = label({
         Text = "CERBERUS",
         FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Bold),
         TextSize = 16,
@@ -445,107 +283,84 @@ function Loader.new()
         Size = UDim2.fromOffset(140, 56),
         Parent = header
     })
-    gradiente(titulo, i.accent, i.accentHi, 90)
-
+    criar("UIGradient", {
+        Color = ColorSequence.new(CORES.accent, CORES.accentHi),
+        Rotation = 90,
+        Parent = title
+    })
+    
     -- Pill "FREE"
-    local pillWrap = q("Frame", {
-        BackgroundColor3 = i.accent,
+    local pillWrap = criar("Frame", {
+        BackgroundColor3 = CORES.accent,
         Position = UDim2.fromOffset(140, 20),
         Size = UDim2.fromOffset(84, 18),
         Parent = header
     })
-    borda(pillWrap, 6)
-    local pillStroke = contorno(pillWrap, i.accent, 0.25)
+    roundCorner(pillWrap, 6)
+    local pillStroke = stroke(pillWrap, CORES.accent, 0.25)
     
-    local pillLbl = texto({
+    local pillLbl = label({
         Text = "FREE",
         FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.SemiBold),
         TextSize = 10,
-        TextColor3 = i.accentDk,
+        TextColor3 = CORES.accentDk,
         TextXAlignment = Enum.TextXAlignment.Center,
         Size = UDim2.fromScale(1, 1),
         Parent = pillWrap
     })
     self.pill, self.pillStroke, self.pillLbl = pillWrap, pillStroke, pillLbl
-
-    -- Botão fechar
-    local closeBtn = q("TextButton", {
+    
+    -- Close
+    local closeBtn = criar("TextButton", {
         Text = "×",
         TextSize = 20,
         FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Medium),
-        TextColor3 = i.subtext,
+        TextColor3 = CORES.subtext,
         AutoButtonColor = false,
-        BackgroundColor3 = i.white,
+        BackgroundColor3 = CORES.white,
         BackgroundTransparency = 1,
         AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, -14, 0, 28),
         Size = UDim2.fromOffset(30, 30),
         Parent = header
     })
-    borda(closeBtn, 8)
+    roundCorner(closeBtn, 8)
+    self:track(closeBtn.MouseButton1Click:Connect(function() self:destroy() end))
     
-    self:track(closeBtn.MouseEnter:Connect(function()
-        s(closeBtn, r(0.1), {
-            BackgroundTransparency = 0.92,
-            TextColor3 = i.danger
-        })
-    end))
-    self:track(closeBtn.MouseLeave:Connect(function()
-        s(closeBtn, r(0.16), {
-            BackgroundTransparency = 1,
-            TextColor3 = i.subtext
-        })
-    end))
-    self:track(closeBtn.MouseButton1Click:Connect(function()
-        self:destroy()
-    end))
-
-    -- Linha divisória
-    q("Frame", {
-        BackgroundColor3 = i.white,
+    -- Linha
+    criar("Frame", {
+        BackgroundColor3 = CORES.white,
         BackgroundTransparency = 0.92,
         BorderSizePixel = 0,
         Position = UDim2.fromOffset(0, 56),
         Size = UDim2.new(1, 0, 0, 1),
         Parent = win
     })
-
-    -- Ícone central
-    local iconWrap = q("Frame", {
-        BackgroundColor3 = i.accent,
+    
+    -- Ícone
+    local iconWrap = criar("Frame", {
+        BackgroundColor3 = CORES.accent,
         BackgroundTransparency = 0.86,
         Position = UDim2.fromOffset(22, 78),
         Size = UDim2.fromOffset(46, 46),
         Parent = win
     })
-    borda(iconWrap, 12)
-    local iconStroke = contorno(iconWrap, i.accent, 0.4)
+    roundCorner(iconWrap, 12)
+    local iconStroke = stroke(iconWrap, CORES.accent, 0.4)
     
-    local logo = q("ImageLabel", {
+    local logo = criar("ImageLabel", {
         BackgroundTransparency = 1,
-        Image = h,
-        ImageColor3 = i.accent,
+        Image = "rbxassetid://136497541793809",
+        ImageColor3 = CORES.accent,
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
         Size = UDim2.fromOffset(26, 26),
         Parent = iconWrap
     })
+    self.iconWrap, self.iconStroke, self.logo = iconWrap, iconStroke, logo
     
-    local glyph = texto({
-        Text = "",
-        FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Bold),
-        TextSize = 24,
-        TextColor3 = i.accent,
-        TextXAlignment = Enum.TextXAlignment.Center,
-        Visible = false,
-        Size = UDim2.fromScale(1, 1),
-        Parent = iconWrap
-    })
-    
-    self.iconWrap, self.iconStroke, self.logo, self.glyph = iconWrap, iconStroke, logo, glyph
-
-    -- Título principal
-    local mainTitle = texto({
+    -- Main Title
+    local mainTitle = label({
         Text = "Cerberus Loader",
         FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Bold),
         TextSize = 18,
@@ -554,13 +369,13 @@ function Loader.new()
         Parent = win
     })
     self.title = mainTitle
-
-    -- Corpo do texto
-    local scroll = q("ScrollingFrame", {
+    
+    -- Body
+    local scroll = criar("ScrollingFrame", {
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ScrollBarThickness = 3,
-        ScrollBarImageColor3 = i.faint,
+        ScrollBarImageColor3 = CORES.faint,
         CanvasSize = UDim2.new(),
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         Position = UDim2.fromOffset(84, 104),
@@ -568,10 +383,10 @@ function Loader.new()
         Parent = win
     })
     
-    local body = texto({
-        Text = "Carregando Cerberus...",
+    local body = label({
+        Text = "Carregando...",
         TextSize = 14,
-        TextColor3 = i.subtext,
+        TextColor3 = CORES.subtext,
         TextWrapped = true,
         TextYAlignment = Enum.TextYAlignment.Top,
         AutomaticSize = Enum.AutomaticSize.Y,
@@ -579,75 +394,55 @@ function Loader.new()
         Parent = scroll
     })
     self.body = body
-
-    -- Barra de progresso
-    local progWrap = q("Frame", {
-        BackgroundColor3 = i.track,
+    
+    -- Progresso
+    local progWrap = criar("Frame", {
+        BackgroundColor3 = CORES.track,
         BorderSizePixel = 0,
         ClipsDescendants = true,
         Position = UDim2.fromOffset(22, 210),
         Size = UDim2.new(1, -44, 0, 5),
         Parent = win
     })
-    borda(progWrap, 3)
+    roundCorner(progWrap, 3)
     
-    local fill = q("Frame", {
-        BackgroundColor3 = i.accent,
+    local fill = criar("Frame", {
+        BackgroundColor3 = CORES.accent,
         BorderSizePixel = 0,
         Size = UDim2.new(0, 0, 1, 0),
         Parent = progWrap
     })
-    borda(fill, 3)
+    roundCorner(fill, 3)
+    self.fill = fill
     
-    local sweep = q("Frame", {
-        BackgroundColor3 = i.accent,
-        BorderSizePixel = 0,
-        Visible = false,
-        Size = UDim2.new(0.32, 0, 1, 0),
-        Position = UDim2.new(-0.35, 0, 0, 0),
-        Parent = progWrap
-    })
-    borda(sweep, 3)
-    q("UIGradient", {
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.5, 0),
-            NumberSequenceKeypoint.new(1, 1)
-        }),
-        Parent = sweep
-    })
-    
-    self.progWrap, self.fill, self.sweep = progWrap, fill, sweep
-
     -- Status
-    local statusRow = q("Frame", {
+    local statusRow = criar("Frame", {
         BackgroundTransparency = 1,
         Position = UDim2.fromOffset(22, 224),
         Size = UDim2.new(1, -44, 0, 16),
         Parent = win
     })
     
-    local statusDot = q("Frame", {
-        BackgroundColor3 = i.accent,
+    local statusDot = criar("Frame", {
+        BackgroundColor3 = CORES.accent,
         Position = UDim2.fromOffset(0, 5),
         Size = UDim2.fromOffset(6, 6),
         Parent = statusRow
     })
-    borda(statusDot, 3)
+    roundCorner(statusDot, 3)
     
-    local statusLbl = texto({
+    local statusLbl = label({
         Text = "Pronto",
         TextSize = 12,
-        TextColor3 = i.faint,
+        TextColor3 = CORES.faint,
         Position = UDim2.fromOffset(14, 0),
         Size = UDim2.new(1, -14, 1, 0),
         Parent = statusRow
     })
+    self.statusDot, self.statusLbl = statusDot, statusLbl
     
-    self.statusRow, self.statusDot, self.statusLbl = statusRow, statusDot, statusLbl
-
     -- Botões
-    local btnRow = q("Frame", {
+    local btnRow = criar("Frame", {
         BackgroundTransparency = 1,
         Visible = false,
         AnchorPoint = Vector2.new(0.5, 1),
@@ -655,7 +450,7 @@ function Loader.new()
         Size = UDim2.new(1, -44, 0, 38),
         Parent = win
     })
-    q("UIListLayout", {
+    criar("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
         HorizontalAlignment = Enum.HorizontalAlignment.Center,
         VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -664,241 +459,128 @@ function Loader.new()
         Parent = btnRow
     })
     self.btnRow = btnRow
-
-    self:entrar()
-    self:arrastar()
-    self:teclas()
-    self:iniciarPulso()
+    
+    -- Anima entrada
+    tween(self.win, 0.22, nil, nil, { GroupTransparency = 0 })
+    tween(self.scale, 0.32, Enum.EasingStyle.Back, nil, { Scale = 1 })
+    
+    -- Drag
+    self:setupDrag()
     
     return self
 end
 
--- MÉTODOS DA CLASSE
-function Loader:track(conexao)
-    table.insert(self.conexoes, conexao)
-    return conexao
+function Loader:track(conn)
+    table.insert(self.conexoes, conn)
+    return conn
 end
 
-function Loader:entrar()
-    s(self.win, r(0.22), { GroupTransparency = 0 })
-    s(self.scale, r(0.32, Enum.EasingStyle.Back), { Scale = 1 })
-end
-
-function Loader:arrastar()
-    local arrastando, posInicial, posHolder
+function Loader:setupDrag()
+    local dragging, startPos, holderPos
     self:track(self.header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
            input.UserInputType == Enum.UserInputType.Touch then
-            arrastando = true
-            posInicial = input.Position
-            posHolder = self.holder.Position
+            dragging = true
+            startPos = input.Position
+            holderPos = self.holder.Position
         end
     end))
-    
-    self:track(a.InputChanged:Connect(function(input)
-        if arrastando and (input.UserInputType == Enum.UserInputType.MouseMovement or 
-                          input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - posInicial
+    self:track(UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or
+                        input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - startPos
             self.holder.Position = UDim2.new(
-                posHolder.X.Scale,
-                posHolder.X.Offset + delta.X,
-                posHolder.Y.Scale,
-                posHolder.Y.Offset + delta.Y
+                holderPos.X.Scale, holderPos.X.Offset + delta.X,
+                holderPos.Y.Scale, holderPos.Y.Offset + delta.Y
             )
         end
     end))
-    
-    self:track(a.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+    self:track(UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
            input.UserInputType == Enum.UserInputType.Touch then
-            arrastando = false
+            dragging = false
         end
     end))
 end
 
-function Loader:teclas()
-    self:track(a.InputBegan:Connect(function(input, processado)
-        if not processado and input.KeyCode == Enum.KeyCode.Return then
-            self:destroy()
-        end
-    end))
+function Loader:setStatus(text, dotColor)
+    self.statusLbl.Text = text
+    if dotColor then self.statusDot.BackgroundColor3 = dotColor end
 end
 
-function Loader:iniciarPulso()
-    if self.pulseTween then return end
-    self.iconStroke.Transparency = 0.4
-    self.pulseTween = s(
-        self.iconStroke,
-        TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-        { Transparency = 0.8 }
-    )
+function Loader:setTitle(text)
+    self.title.Text = text
 end
 
-function Loader:pararPulso()
+function Loader:setBody(text)
+    self.body.Text = text
+end
+
+function Loader:setPill(text, color)
+    self.pillLbl.Text = text
+    self.pillLbl.TextColor3 = color
+    self.pillStroke.Color = color
+    self.pillStroke.Transparency = color == CORES.faint and 0.4 or 0.25
+end
+
+function Loader:setProgress(value)
+    tween(self.fill, 0.35, nil, nil, {
+        Size = UDim2.new(math.clamp(value, 0, 1), 0, 1, 0)
+    })
+end
+
+function Loader:showButtons(buttons)
+    for _, btn in ipairs(self.btnRow:GetChildren()) do
+        if btn:IsA("TextButton") then btn:Destroy() end
+    end
+    if not buttons or #buttons == 0 then
+        self.btnRow.Visible = false
+        return
+    end
+    for i, config in ipairs(buttons) do
+        local primary = config.kind == "primary"
+        local w = primary and 158 or 116
+        local btn = criar("TextButton", {
+            Text = config.text,
+            FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json",
+                primary and Enum.FontWeight.SemiBold or Enum.FontWeight.Medium),
+            TextSize = 13,
+            TextColor3 = primary and CORES.accentDk or CORES.subtext,
+            AutoButtonColor = false,
+            BackgroundColor3 = primary and CORES.accent or CORES.surface2,
+            LayoutOrder = i,
+            Size = UDim2.fromOffset(w, 36),
+            Parent = self.btnRow
+        })
+        roundCorner(btn, 10)
+        if not primary then stroke(btn, CORES.white, 0.9) end
+        
+        self:track(btn.MouseButton1Click:Connect(function()
+            if config.cb then config.cb() end
+        end))
+    end
+    self.btnRow.Visible = true
+end
+
+function Loader:showError(title, body, buttons)
+    self:setPill("ERRO", CORES.danger)
+    self:setTitle(title)
+    self:setBody(body)
+    self:setStatus("Falhou", CORES.danger)
+    self.iconWrap.BackgroundColor3 = CORES.danger
+    self.iconStroke.Color = CORES.danger
+    self.logo.ImageColor3 = CORES.danger
+    if buttons then self:showButtons(buttons) end
+end
+
+function Loader:fadeOut(callback)
     if self.pulseTween then
         self.pulseTween:Cancel()
         self.pulseTween = nil
     end
-    self.iconStroke.Transparency = 0.4
-end
-
-function Loader:modo(texto, cor)
-    self.pillLbl.Text = texto
-    self.pillLbl.TextColor3 = cor
-    self.pillStroke.Color = cor
-    self.pillStroke.Transparency = cor == i.faint and 0.4 or 0.25
-end
-
-function Loader:icone(cor, simbolo)
-    self.iconWrap.BackgroundColor3 = cor
-    self.iconStroke.Color = cor
-    if simbolo then
-        self.logo.Visible = false
-        self.glyph.Visible = true
-        self.glyph.Text = simbolo
-        self.glyph.TextColor3 = cor
-    else
-        self.glyph.Visible = false
-        self.logo.Visible = true
-        self.logo.ImageColor3 = cor
-    end
-end
-
-function Loader:definir(props)
-    if props.title then self.title.Text = props.title end
-    if props.titleColor then self.title.TextColor3 = props.titleColor end
-    if props.body then self.body.Text = props.body end
-    if props.status then self.statusLbl.Text = props.status end
-    if props.statusDot then self.statusDot.BackgroundColor3 = props.statusDot end
-end
-
-function Loader:working(ativo)
-    self.progWrap.Visible = ativo
-    self.statusRow.Visible = ativo
-    self.btnRow.Visible = not ativo
-    if ativo then
-        self:iniciarPulso()
-    else
-        self:pararPulso()
-    end
-end
-
-function Loader:progresso(valor)
-    self.sweep.Visible = false
-    if self.sweepTween then
-        self.sweepTween:Cancel()
-        self.sweepTween = nil
-    end
-    s(self.fill, r(0.35), {
-        Size = UDim2.new(math.clamp(valor, 0, 1), 0, 1, 0)
-    })
-end
-
-function Loader:ocupado()
-    self:working(true)
-    self.fill.Size = UDim2.new(0, 0, 1, 0)
-    self.sweep.Visible = true
-    if self.sweepTween then
-        self.sweepTween:Cancel()
-    end
-    self.sweep.Position = UDim2.new(-0.35, 0, 0, 0)
-    self.sweepTween = s(
-        self.sweep,
-        TweenInfo.new(1.1, Enum.EasingStyle.Linear, Enum.EasingDirection.Out, -1),
-        { Position = UDim2.new(1.03, 0, 0, 0) }
-    )
-end
-
-function Loader:botoes(lista)
-    for _, btn in ipairs(self.btnRow:GetChildren()) do
-        if btn:IsA("TextButton") then
-            btn:Destroy()
-        end
-    end
-    
-    if not lista or #lista == 0 then
-        self.btnRow.Visible = false
-        return
-    end
-    
-    for indice, config in ipairs(lista) do
-        local primario = config.kind == "primary"
-        local largura = primario and 158 or 116
-        
-        local btn = q("TextButton", {
-            Text = config.text,
-            FontFace = Font.new(
-                "rbxasset://fonts/families/BuilderSans.json",
-                primario and Enum.FontWeight.SemiBold or Enum.FontWeight.Medium
-            ),
-            TextSize = 13,
-            TextColor3 = primario and i.accentDk or i.subtext,
-            AutoButtonColor = false,
-            BackgroundColor3 = primario and i.accent or i.surface2,
-            LayoutOrder = indice,
-            Size = UDim2.fromOffset(largura, 36),
-            Parent = self.btnRow
-        })
-        borda(btn, 10)
-        if not primario then
-            contorno(btn, i.white, 0.9)
-        end
-        
-        self:track(btn.MouseEnter:Connect(function()
-            s(btn, r(0.1), primario and
-                { BackgroundColor3 = i.accentHi } or
-                { TextColor3 = i.text, BackgroundColor3 = i.track }
-            )
-        end))
-        
-        self:track(btn.MouseLeave:Connect(function()
-            s(btn, r(0.16), primario and
-                { BackgroundColor3 = i.accent } or
-                { TextColor3 = i.subtext, BackgroundColor3 = i.surface2 }
-            )
-        end))
-        
-        self:track(btn.MouseButton1Click:Connect(function()
-            if config.flash then
-                local resultado = config.cb and config.cb()
-                btn.Text = (resultado == false) and "Indisponível" or config.flash
-                task.delay(1.4, function()
-                    if btn.Parent then
-                        btn.Text = config.text
-                    end
-                end)
-            elseif config.cb then
-                config.cb()
-            end
-        end))
-    end
-    
-    self.btnRow.Visible = true
-end
-
-function Loader:erro(props)
-    self:pararPulso()
-    self:working(false)
-    self:modo(props.pill or "ERRO", props.color or i.danger)
-    self:icone(props.color or i.danger, props.glyph or "!")
-    self:definir({
-        title = props.title,
-        titleColor = props.color or i.danger,
-        body = props.body
-    })
-    self:botoes(props.buttons)
-end
-
-function Loader:desaparecer(callback)
-    self:pararPulso()
-    if self.sweepTween then
-        self.sweepTween:Cancel()
-        self.sweepTween = nil
-    end
-    
-    s(self.scale, r(0.2), { Scale = 0.96 })
-    local tween = s(self.win, r(0.2), { GroupTransparency = 1 })
-    tween.Completed:Connect(function()
+    tween(self.scale, 0.2, nil, nil, { Scale = 0.96 })
+    local tw = tween(self.win, 0.2, nil, nil, { GroupTransparency = 1 })
+    tw.Completed:Connect(function()
         self:destroy()
         if callback then callback() end
     end)
@@ -915,182 +597,97 @@ function Loader:destroy()
     end
 end
 
--- FUNÇÕES DE CARREGAMENTO
-local function copiar(texto)
-    if setclipboard then
-        setclipboard(texto)
-        return true
+-- ===== FUNÇÕES DE CARREGAMENTO =====
+local function getScript(url, nocache)
+    local url = nocache and (url .. "?t=" .. tostring(math.random())) or url
+    local success, content = pcall(function() return game:HttpGet(url) end)
+    if success and type(content) == "string" and #content > 10 then
+        return content
     end
-    return false
-end
-
-local function obterScript(url, semCache)
-    local url = semCache and (url .. "?t=" .. tostring(math.random(1, 1000000))) or url
-    
-    local sucesso, conteudo = pcall(function()
-        return game:HttpGet(url)
-    end)
-    
-    if sucesso and type(conteudo) == "string" and #conteudo > 10 then
-        return conteudo
-    end
-    
-    local requisicao = (type(request) == "function" and request) or
-                      (type(http_request) == "function" and http_request) or
-                      (type(syn) == "table" and type(syn.request) == "function" and syn.request)
-    
-    if requisicao then
-        local sucesso, resposta = pcall(function()
-            return requisicao({
-                Url = url,
-                Method = "GET"
-            })
+    local req = (type(request) == "function" and request) or
+                (type(http_request) == "function" and http_request) or
+                (type(syn) == "table" and type(syn.request) == "function" and syn.request)
+    if req then
+        local ok, res = pcall(function()
+            return req({ Url = url, Method = "GET" })
         end)
-        if sucesso and resposta and resposta.Body and #resposta.Body > 10 then
-            return resposta.Body
+        if ok and res and res.Body and #res.Body > 10 then
+            return res.Body
         end
     end
-    
     return nil
 end
 
-local function carregarScript(url, nome, semCache)
-    local loader = loaderInstance
-    loader:definir({
-        status = "Carregando " .. nome,
-        statusDot = i.accent
-    })
-    loader:ocupado()
+local function loadAndRun(loader, url, name, nocache)
+    loader:setStatus("Carregando " .. name, CORES.accent)
+    loader:setProgress(0.5)
     
-    local scriptContent = obterScript(url, semCache)
-    
-    if not scriptContent then
-        loader:erro({
-            title = "Não foi possível conectar",
-            pill = "OFFLINE",
-            body = "Não foi possível carregar " .. nome .. ". Verifique sua conexão e tente novamente.",
-            buttons = {
-                {
-                    text = "Tentar novamente",
-                    kind = "primary",
-                    cb = function()
-                        task.spawn(carregarScript, url, nome, semCache)
-                    end
-                },
-                {
-                    text = "Fechar",
-                    kind = "ghost",
-                    cb = function()
-                        loader:destroy()
-                    end
-                }
-            }
-        })
+    local content = getScript(url, nocache)
+    if not content then
+        loader:showError("Falha no carregamento",
+            "Não foi possível carregar " .. name .. ".\nVerifique sua conexão.",
+            { { text = "Fechar", kind = "ghost", cb = function() loader:destroy() end } }
+        )
         return
     end
     
-    local funcao, erro = loadstring(scriptContent)
-    
-    if not funcao then
-        loader:erro({
-            title = "Erro no script",
-            pill = "ERRO",
-            body = "O script carregou mas não compilou. Tente novamente.\n\n" .. tostring(erro),
-            buttons = {
-                {
-                    text = "Tentar novamente",
-                    kind = "primary",
-                    cb = function()
-                        task.spawn(carregarScript, url, nome, semCache)
-                    end
-                },
-                {
-                    text = "Fechar",
-                    kind = "ghost",
-                    cb = function()
-                        loader:destroy()
-                    end
-                }
-            }
-        })
+    loader:setProgress(0.7)
+    local fn, err = loadstring(content)
+    if not fn then
+        loader:showError("Erro no script",
+            "O script não compilou.\n\n" .. tostring(err),
+            { { text = "Fechar", kind = "ghost", cb = function() loader:destroy() end } }
+        )
         return
     end
     
-    loader:definir({
-        title = "Pronto",
-        body = "Iniciando " .. nome .. ".",
-        status = "Carregado",
-        statusDot = i.accent
-    })
-    loader:progresso(1)
-    
-    task.wait(0.2)
-    loader:desaparecer(function()
-        pcall(funcao)
+    loader:setStatus("Carregado!", CORES.accent)
+    loader:setProgress(1)
+    task.wait(0.3)
+    loader:fadeOut(function()
+        pcall(fn)
     end)
 end
 
--- INÍCIO DO SCRIPT
-local loaderInstance = Loader.new()
-local loader = loaderInstance
+-- ===== INÍCIO =====
+local loader = Loader.new()
+loader:setTitle("Iniciando")
+loader:setBody("Preparando Cerberus...")
+loader:setStatus("Detectando jogo", CORES.accent)
+loader:setPill("FREE", CORES.accent)
 
 task.spawn(function()
-    loader:definir({
-        title = "Iniciando",
-        body = "Preparando Cerberus.",
-        status = "Detectando jogo",
-        statusDot = i.accent
-    })
-    loader:ocupado()
-    
     task.wait(0.35)
     
     local gameId = tostring(game.GameId)
-    local scriptName = j[gameId]
+    local scriptName = GAME_SCRIPTS[gameId]
     
     if not scriptName then
-        loader:modo("UNIVERSAL", i.amber)
-        loader:icone(i.amber, "∞")
-        loader:definir({
-            title = "Modo Universal",
-            titleColor = i.amber,
-            body = "Este jogo não está no catálogo Cerberus. Carregando script universal.",
-            status = "Usando universal",
-            statusDot = i.amber
-        })
-        loader:ocupado()
-        task.wait(1.1)
-        carregarScript(f, "script universal", false)
+        loader:setPill("UNIVERSAL", CORES.amber)
+        loader:setTitle("Modo Universal")
+        loader:setBody("Este jogo não está no catálogo. Carregando script universal.")
+        loader:setStatus("Universal", CORES.amber)
+        loader.iconWrap.BackgroundColor3 = CORES.amber
+        loader.iconStroke.Color = CORES.amber
+        loader.logo.ImageColor3 = CORES.amber
+        task.wait(0.5)
+        loadAndRun(loader, UNIVERSAL_URL, "Universal", false)
         return
     end
     
-    local nomeFormatado = formatarNome(scriptName)
-    local nomeArquivo = scriptName
-    
-    local variacao = _G.VARIANT
-    if type(variacao) == "string" and variacao ~= "" then
-        nomeArquivo = nomeArquivo:gsub("%.lua$", "") .. "." .. variacao .. ".lua"
-    end
-    
-    loader:definir({
-        title = nomeFormatado,
-        body = "Script Cerberus dedicado encontrado para este jogo.",
-        status = "Jogo detectado",
-        statusDot = i.accent
-    })
-    loader:progresso(0.25)
+    local formatted = formatarNome(scriptName)
+    loader:setTitle(formatted)
+    loader:setBody("Script dedicado encontrado para este jogo.")
+    loader:setStatus("Jogo detectado", CORES.accent)
+    loader:setProgress(0.3)
     task.wait(0.3)
     
-    -- SEMPRE LIVRE - Premium desbloqueado
-    loader:modo("FREE", i.accent)
-    loader:definir({
-        status = "✅ Premium desbloqueado",
-        statusDot = i.accent
-    })
-    
-    loader:progresso(0.6)
+    -- Sempre livre
+    loader:setPill("FREE", CORES.accent)
+    loader:setStatus("✅ Premium desbloqueado", CORES.accent)
+    loader:setProgress(0.6)
     task.wait(0.2)
     
-    local url = e .. nomeArquivo
-    carregarScript(url, nomeFormatado, true)
+    local url = BASE_URL .. scriptName
+    loadAndRun(loader, url, formatted, true)
 end)
