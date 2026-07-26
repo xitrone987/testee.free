@@ -1,412 +1,167 @@
 --[[
-    Shadow Loader v3.1 - UI Fixa (Shindo Life 2)
-    Todas as opções sempre visíveis.
+    Cerberus Loader com Patch Premium (Shindo Life 2)
+    Baixa o script original e modifica para liberar todas as funções
 ]]
 
 -- ===== SERVIÇOS =====
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Player = Players.LocalPlayer
+-- ===== URL DO SCRIPT ORIGINAL =====
+local CERBERUS_URL = "https://raw.githubusercontent.com/safetrademarketplace/scripts/refs/heads/main/shindoLife.lua"
+-- (se esse link não funcionar, use o link do loader original que tem o mapeamento)
 
--- ===== CORES =====
-local C = {
-    bg = Color3.fromRGB(15, 18, 25),
-    surface = Color3.fromRGB(22, 26, 36),
-    surface2 = Color3.fromRGB(30, 36, 48),
-    accent = Color3.fromRGB(90, 255, 140),
-    text = Color3.fromRGB(240, 245, 255),
-    subtext = Color3.fromRGB(150, 160, 180),
-    white = Color3.fromRGB(255, 255, 255),
-}
-
--- ===== ESTADO =====
-local State = {
-    NoCooldown = false,
-    AutoFarm = false,
-    AutoSpin = false,
-    AutoQuest = false,
-    SpeedHack = false,
-}
-
--- ===== FUNÇÕES AUXILIARES =====
-local function criar(cls, props)
-    local obj = Instance.new(cls)
-    if props then
-        for k, v in pairs(props) do
-            if k ~= "Parent" then obj[k] = v end
-        end
-        if props.Parent then obj.Parent = props.Parent end
+-- ===== FUNÇÃO PARA BAIXAR O SCRIPT =====
+local function getScript(url)
+    local success, content = pcall(function()
+        return game:HttpGet(url)
+    end)
+    if success and type(content) == "string" and #content > 10 then
+        return content
     end
-    return obj
+    -- Fallback para outros métodos
+    local req = (type(request) == "function" and request) or
+                (type(http_request) == "function" and http_request) or
+                (type(syn) == "table" and type(syn.request) == "function" and syn.request)
+    if req then
+        local ok, res = pcall(function()
+            return req({ Url = url, Method = "GET" })
+        end)
+        if ok and res and res.Body and #res.Body > 10 then
+            return res.Body
+        end
+    end
+    return nil
 end
 
-local function round(obj, r)
-    return criar("UICorner", { CornerRadius = UDim.new(0, r), Parent = obj })
+-- ===== PATCH NO CÓDIGO FONTE =====
+local function patchScript(original)
+    -- 1. Remove verificações de chave
+    local patched = original
+        :gsub("check_key%([^)]*%)", "function() return true end")
+        :gsub("KEY_VALID", "true")
+        :gsub("script_key", '"FREE_PREMIUM"')
+        :gsub('"NO_KEY"', '"KEY_VALID"')
+        :gsub('"KEY_INVALID"', '"KEY_VALID"')
+        :gsub('"EXPIRED"', '"KEY_VALID"')
+    
+    -- 2. Força variáveis globais
+    local header = [[
+        -- PATCH INJETADO
+        _G.Cerberus = { Premium = true, HasKey = true, Unlocked = true, NoCooldown = true }
+        _G.cerberus = { Premium = true, HasKey = true, Unlocked = true, NoCooldown = true }
+        _G.CERBERUS_ALLOW_NO_KEY = true
+        _G.inDiscord = true
+        script_key = "FREE_PREMIUM"
+        getgenv().script_key = "FREE_PREMIUM"
+        
+        -- Substitui funções de verificação
+        local oldCheck = check_key or function() return false end
+        check_key = function() return true end
+        getgenv().check_key = function() return true end
+        
+        print("[PATCH] Premium liberado com sucesso!")
+    ]]
+    
+    return header .. "\n\n" .. patched
 end
 
-local function stroke(obj, color, transp)
-    return criar("UIStroke", {
-        Color = color,
-        Transparency = transp or 0.8,
-        Thickness = 1,
-        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-        Parent = obj
-    })
-end
-
--- ===== UI =====
+-- ===== UI SIMPLES DE CARREGAMENTO =====
 local function criarUI()
-    -- Limpa UI antiga
+    -- Remove UI antiga
     for _, child in ipairs(CoreGui:GetChildren()) do
-        if child:IsA("ScreenGui") and child.Name == "ShadowUI" then
+        if child:IsA("ScreenGui") and child.Name == "CerberusPatch" then
             child:Destroy()
         end
     end
 
-    local screenGui = criar("ScreenGui", {
-        Name = "ShadowUI",
-        ResetOnSpawn = false,
-        IgnoreGuiInset = true,
-        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-        DisplayOrder = 999999,
-        Parent = CoreGui
-    })
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "CerberusPatch"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.DisplayOrder = 999999
+    screenGui.Parent = CoreGui
 
     pcall(function()
         if syn and syn.protect_gui then syn.protect_gui(screenGui)
         elseif protectgui then protectgui(screenGui) end
     end)
 
-    -- Container
-    local holder = criar("Frame", {
-        BackgroundTransparency = 1,
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(340, 460),
-        Parent = screenGui
-    })
-
-    local main = criar("Frame", {
-        BackgroundColor3 = C.bg,
-        Size = UDim2.fromScale(1, 1),
-        Parent = holder
-    })
-    round(main, 12)
-    stroke(main, C.white, 0.85)
-
-    -- Header (arrastável)
-    local header = criar("Frame", {
-        BackgroundColor3 = C.surface,
-        Size = UDim2.new(1, 0, 0, 40),
-        Parent = main
-    })
-    round(header, 12)
-    criar("UICorner", { CornerRadius = UDim.new(0, 12), Parent = header })
+    local frame = Instance.new("Frame")
+    frame.BackgroundColor3 = Color3.fromRGB(15, 18, 25)
+    frame.Size = UDim2.fromOffset(300, 120)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -60)
+    frame.AnchorPoint = Vector2.new(0, 0)
+    frame.Parent = screenGui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
 
     local title = Instance.new("TextLabel")
     title.BackgroundTransparency = 1
     title.FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Bold)
-    title.Text = "Shadow Loader [SL2]"
-    title.TextColor3 = C.accent
+    title.Text = "Cerberus Patch"
+    title.TextColor3 = Color3.fromRGB(90, 255, 140)
     title.TextSize = 18
-    title.Position = UDim2.fromOffset(16, 8)
-    title.Size = UDim2.new(0.7, 0, 1, 0)
+    title.Position = UDim2.new(0, 16, 0, 12)
+    title.Size = UDim2.new(1, -32, 0, 30)
     title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = header
+    title.Parent = frame
 
-    local closeBtn = criar("TextButton", {
-        Text = "×",
-        TextSize = 18,
-        FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Bold),
-        TextColor3 = C.subtext,
-        AutoButtonColor = false,
-        BackgroundTransparency = 1,
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -12, 0.5, 0),
-        Size = UDim2.fromOffset(30, 30),
-        Parent = header
-    })
-    closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
-
-    -- Área de conteúdo (sem rolagem, com tamanho fixo)
-    local content = criar("Frame", {
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, -20, 1, -55),
-        Position = UDim2.new(0, 10, 0, 45),
-        Parent = main
-    })
-
-    -- ===== FUNÇÃO PARA CRIAR TOGGLE =====
-    local function criarToggle(texto, estadoInicial, callback, yPos)
-        local frame = criar("Frame", {
-            BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, 40),
-            Position = UDim2.new(0, 0, 0, yPos),
-            Parent = content
-        })
-
-        local label = Instance.new("TextLabel")
-        label.BackgroundTransparency = 1
-        label.FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Medium)
-        label.Text = texto
-        label.TextColor3 = C.text
-        label.TextSize = 15
-        label.Position = UDim2.fromOffset(0, 8)
-        label.Size = UDim2.new(0.7, 0, 1, 0)
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = frame
-
-        local bg = criar("Frame", {
-            BackgroundColor3 = estadoInicial and C.accent or C.surface2,
-            BackgroundTransparency = 0.2,
-            Position = UDim2.new(0.82, 0, 0.15, 0),
-            Size = UDim2.fromOffset(44, 24),
-            Parent = frame
-        })
-        round(bg, 12)
-
-        local knob = criar("Frame", {
-            BackgroundColor3 = C.white,
-            Position = estadoInicial and UDim2.new(0.55, 0, 0.08, 0) or UDim2.new(0.05, 0, 0.08, 0),
-            Size = UDim2.fromOffset(20, 20),
-            Parent = bg
-        })
-        round(knob, 10)
-
-        local ativo = estadoInicial
-
-        local function alternar()
-            ativo = not ativo
-            bg.BackgroundColor3 = ativo and C.accent or C.surface2
-            knob.Position = ativo and UDim2.new(0.55, 0, 0.08, 0) or UDim2.new(0.05, 0, 0.08, 0)
-            callback(ativo)
-        end
-
-        bg.MouseButton1Click:Connect(alternar)
-        knob.MouseButton1Click:Connect(alternar)
-
-        return frame
-    end
-
-    -- ===== POSIÇÕES FIXAS =====
-    local y = 0
-    local function nextY()
-        local pos = y
-        y = y + 44
-        return pos
-    end
-
-    -- 1. No Cooldown
-    criarToggle("⚡ No Cooldown", State.NoCooldown, function(val)
-        State.NoCooldown = val
-        print("[Shadow] No Cooldown:", val and "ON" or "OFF")
-    end, nextY())
-
-    -- 2. Auto Farm
-    criarToggle("⚔️ Auto Farm", State.AutoFarm, function(val)
-        State.AutoFarm = val
-        print("[Shadow] Auto Farm:", val and "ON" or "OFF")
-        if val then
-            task.spawn(function()
-                while State.AutoFarm and screenGui.Parent do
-                    pcall(function()
-                        local char = Player.Character
-                        if char then
-                            local hrp = char:FindFirstChild("HumanoidRootPart")
-                            if hrp then
-                                for _, obj in ipairs(workspace:GetChildren()) do
-                                    if obj:IsA("Model") and obj ~= char and obj:FindFirstChild("Humanoid") then
-                                        local targetHrp = obj:FindFirstChild("HumanoidRootPart")
-                                        if targetHrp and (targetHrp.Position - hrp.Position).Magnitude < 50 then
-                                            local hum = obj:FindFirstChildOfClass("Humanoid")
-                                            if hum and hum.Health > 0 then
-                                                local tool = char:FindFirstChildOfClass("Tool")
-                                                if tool then tool:Activate() end
-                                                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                                                task.wait(0.05)
-                                                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-                                                break
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end)
-                    task.wait(0.3)
-                end
-            end)
-        end
-    end, nextY())
-
-    -- 3. Auto Spin
-    criarToggle("🌀 Auto Spin", State.AutoSpin, function(val)
-        State.AutoSpin = val
-        print("[Shadow] Auto Spin:", val and "ON" or "OFF")
-        if val then
-            task.spawn(function()
-                while State.AutoSpin and screenGui.Parent do
-                    pcall(function()
-                        -- Tenta achar botão de spin
-                        local spinBtn = nil
-                        for _, gui in ipairs(CoreGui:GetChildren()) do
-                            if gui:IsA("ScreenGui") then
-                                for _, btn in ipairs(gui:GetDescendants()) do
-                                    if btn:IsA("TextButton") and btn.Visible and btn.Active then
-                                        local txt = btn.Text or ""
-                                        if txt:lower():find("spin") or txt:lower():find("girar") then
-                                            spinBtn = btn
-                                            break
-                                        end
-                                    end
-                                end
-                            end
-                            if spinBtn then break end
-                        end
-                        if spinBtn then
-                            spinBtn:Click()
-                        else
-                            -- Tenta remote
-                            for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
-                                if remote:IsA("RemoteEvent") and remote.Name:lower():find("spin") then
-                                    remote:FireServer()
-                                    break
-                                end
-                            end
-                        end
-                    end)
-                    task.wait(1)
-                end
-            end)
-        end
-    end, nextY())
-
-    -- 4. Auto Quest
-    criarToggle("📜 Auto Quest", State.AutoQuest, function(val)
-        State.AutoQuest = val
-        print("[Shadow] Auto Quest:", val and "ON" or "OFF")
-        if val then
-            task.spawn(function()
-                while State.AutoQuest and screenGui.Parent do
-                    pcall(function()
-                        for _, gui in ipairs(CoreGui:GetChildren()) do
-                            if gui:IsA("ScreenGui") then
-                                for _, btn in ipairs(gui:GetDescendants()) do
-                                    if btn:IsA("TextButton") and btn.Visible and btn.Active then
-                                        local txt = btn.Text or ""
-                                        if txt:lower():find("quest") or txt:lower():find("missão") or txt:lower():find("accept") or txt:lower():find("complete") then
-                                            btn:Click()
-                                            task.wait(0.5)
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end)
-                    task.wait(2)
-                end
-            end)
-        end
-    end, nextY())
-
-    -- 5. Speed Hack
-    criarToggle("🏃 Speed Hack", State.SpeedHack, function(val)
-        State.SpeedHack = val
-        print("[Shadow] Speed Hack:", val and "ON" or "OFF")
-        pcall(function()
-            local char = Player.Character
-            if char and char:FindFirstChild("Humanoid") then
-                char.Humanoid.WalkSpeed = val and 50 or 16
-            end
-        end)
-    end, nextY())
-
-    -- Status extra
     local status = Instance.new("TextLabel")
     status.BackgroundTransparency = 1
     status.FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Medium)
-    status.Text = "Pressione RightControl para fechar/abrir"
-    status.TextColor3 = C.subtext
-    status.TextSize = 12
-    status.Position = UDim2.new(0, 0, 0, y + 10)
-    status.Size = UDim2.new(1, 0, 0, 20)
-    status.TextXAlignment = Enum.TextXAlignment.Center
-    status.Parent = content
+    status.Text = "Carregando script..."
+    status.TextColor3 = Color3.fromRGB(240, 245, 255)
+    status.TextSize = 14
+    status.Position = UDim2.new(0, 16, 0, 48)
+    status.Size = UDim2.new(1, -32, 0, 24)
+    status.TextXAlignment = Enum.TextXAlignment.Left
+    status.Parent = frame
 
-    -- ===== LOOP DO NO COOLDOWN =====
-    task.spawn(function()
-        while true do
-            task.wait(0.5)
-            if State.NoCooldown then
-                pcall(function()
-                    local char = Player.Character
-                    if char then
-                        for _, child in ipairs(char:GetDescendants()) do
-                            if child:IsA("NumberValue") and tostring(child.Name):lower():find("cooldown") then
-                                child.Value = 0
-                            end
-                            if child:IsA("BoolValue") and tostring(child.Name):lower():find("cooldown") then
-                                child.Value = false
-                            end
-                            if child:IsA("IntValue") and tostring(child.Name):lower():find("cooldown") then
-                                child.Value = 0
-                            end
-                        end
-                        if char:FindFirstChild("Attributes") then
-                            for attr, value in pairs(char.Attributes:GetAttributes()) do
-                                if type(value) == "number" and tostring(attr):lower():find("cooldown") then
-                                    char.Attributes[attr] = 0
-                                end
-                            end
-                        end
-                    end
-                end)
-            end
-        end
-    end)
-
-    -- ===== DRAG =====
-    local dragging, startPos, startHolder
-    header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            startPos = input.Position
-            startHolder = holder.Position
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - startPos
-            holder.Position = UDim2.new(startHolder.X.Scale, startHolder.X.Offset + delta.X, startHolder.Y.Scale, startHolder.Y.Offset + delta.Y)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-
-    return screenGui
+    return screenGui, status
 end
 
--- ===== ATALHO =====
-local ui = nil
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.RightControl then
-        if ui and ui.Parent then
-            ui:Destroy()
-            ui = nil
-        else
-            ui = criarUI()
-        end
+-- ===== MAIN =====
+local ui, statusLabel = criarUI()
+
+task.spawn(function()
+    statusLabel.Text = "Baixando script original..."
+    local original = getScript(CERBERUS_URL)
+    
+    if not original then
+        statusLabel.Text = "Erro: não foi possível baixar o script."
+        statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        task.wait(3)
+        ui:Destroy()
+        return
     end
+
+    statusLabel.Text = "Aplicando patch premium..."
+    task.wait(0.5)
+    
+    local patched = patchScript(original)
+    
+    statusLabel.Text = "Carregando script modificado..."
+    task.wait(0.5)
+    
+    local fn, err = loadstring(patched)
+    if not fn then
+        statusLabel.Text = "Erro ao compilar: " .. tostring(err)
+        statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        task.wait(3)
+        ui:Destroy()
+        return
+    end
+
+    statusLabel.Text = "Executando... (todas as funções liberadas)"
+    statusLabel.TextColor3 = Color3.fromRGB(90, 255, 140)
+    task.wait(1)
+    
+    -- Fecha a UI e executa o script
+    ui:Destroy()
+    pcall(fn)
 end)
 
-ui = criarUI()
-print("Shadow Loader v3.1 [SL2] carregado! Pressione RightControl.")
+print("Cerberus Patch carregado. Aguarde...")
