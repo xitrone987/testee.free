@@ -1,21 +1,90 @@
 --[[
-    Cerberus Loader - Versão Livre Completa
+    Cerberus Loader - Versão Livre Completa (UI Garantida)
     Todas as funcionalidades premium desbloqueadas
-    Sem verificações de chave, sem cooldowns, sem restrições
+    UI forçada a aparecer em qualquer executor
 ]]
+
+-- FORÇA A UI A APARECER
+local function forcarUI()
+    -- Tenta diferentes métodos para criar a UI
+    local sucesso, gui = pcall(function()
+        -- Método 1: CoreGui
+        return game:GetService("CoreGui")
+    end)
+    
+    if not sucesso or not gui then
+        -- Método 2: PlayerGui
+        pcall(function()
+            gui = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        end)
+    end
+    
+    if not gui then
+        -- Método 3: Criar um novo ScreenGui direto
+        pcall(function()
+            gui = Instance.new("ScreenGui")
+            gui.Parent = game:GetService("CoreGui")
+        end)
+    end
+    
+    return gui
+end
+
+-- Remove UIs antigas do Cerberus
+local function limparUI()
+    pcall(function()
+        local coreGui = game:GetService("CoreGui")
+        for _, child in ipairs(coreGui:GetChildren()) do
+            if child:IsA("ScreenGui") and child.Name == "CerberusLoaderGui" then
+                child:Destroy()
+            end
+        end
+    end)
+    
+    pcall(function()
+        local player = game:GetService("Players").LocalPlayer
+        if player then
+            local playerGui = player:FindFirstChildOfClass("PlayerGui")
+            if playerGui then
+                for _, child in ipairs(playerGui:GetChildren()) do
+                    if child:IsA("ScreenGui") and child.Name == "CerberusLoaderGui" then
+                        child:Destroy()
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Executa a limpeza
+limparUI()
+
+-- Força a criação da UI
+local CoreGui = forcarUI()
+
+-- Se ainda não tiver CoreGui, cria um
+if not CoreGui then
+    CoreGui = Instance.new("ScreenGui")
+    CoreGui.Name = "CerberusLoaderGui"
+    CoreGui.Parent = game:GetService("CoreGui")
+    CoreGui.ResetOnSpawn = false
+    CoreGui.IgnoreGuiInset = true
+    CoreGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    CoreGui.DisplayOrder = 999999
+end
 
 local a = game:GetService("UserInputService")
 local b = game:GetService("TweenService")
 local c = game:GetService("Players")
-local d = game:GetService("CoreGui")
+local d = CoreGui -- Usa o CoreGui que criamos
 
--- URLs dos scripts (mantidas as originais)
+-- URLs dos scripts
 local e = "https://raw.githubusercontent.com/safetrademarketplace/scripts/refs/heads/main/"
 local f = "https://api.luarmor.net/files/v4/loaders/1acad587672d96c8afb9c5bbc36bf921.lua"
 local g = "https://getcerberus.com/discord"
 local h = "rbxassetid://136497541793809"
 
--- Cores do tema (mantidas)
+-- Cores do tema
 local i = {
     bg = Color3.fromRGB(12,15,21),
     surface = Color3.fromRGB(20,25,33),
@@ -32,7 +101,7 @@ local i = {
     white = Color3.fromRGB(255,255,255)
 }
 
--- Mapeamento de jogos (mantido)
+-- Mapeamento de jogos
 local j = {
     ["3764534614"] = "runeSlayer.lua",
     ["6115988515"] = "animeSaga.lua",
@@ -112,7 +181,7 @@ local j = {
     ["1511883870"] = "shindoLife.lua"
 }
 
--- Scripts gratuitos (mantido)
+-- Scripts gratuitos
 local k = {
     ["animeExpeditions.lua"] = true,
     ["gag2.lua"] = true,
@@ -125,7 +194,7 @@ local k = {
     ["shindoLife.lua"] = true
 }
 
--- Funções auxiliares (mantidas)
+-- Funções auxiliares
 local function q(tipo, props)
     local obj = Instance.new(tipo)
     if props then
@@ -199,15 +268,48 @@ local function texto(props)
 end
 
 local function obterGui()
+    -- Tenta CoreGui primeiro
     local sucesso, resultado = pcall(function()
-        return gethui and gethui()
+        return game:GetService("CoreGui")
     end)
-    if sucesso and typeof(resultado) == "Instance" then
+    if sucesso and resultado then
         return resultado
     end
-    if d then return d end
-    local jogador = c.LocalPlayer
-    return jogador and jogador:FindFirstChildOfClass("PlayerGui")
+    
+    -- Tenta PlayerGui
+    pcall(function()
+        local player = c.LocalPlayer
+        if player then
+            resultado = player:FindFirstChildOfClass("PlayerGui")
+            if resultado then return resultado end
+        end
+    end)
+    
+    -- Fallback: cria um ScreenGui
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "CerberusLoaderGui"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.DisplayOrder = 999999
+    
+    pcall(function()
+        gui.Parent = game:GetService("CoreGui")
+    end)
+    
+    if not gui.Parent then
+        pcall(function()
+            local player = c.LocalPlayer
+            if player then
+                local playerGui = player:FindFirstChildOfClass("PlayerGui")
+                if playerGui then
+                    gui.Parent = playerGui
+                end
+            end
+        end)
+    end
+    
+    return gui
 end
 
 local function formatarNome(nome)
@@ -217,14 +319,20 @@ local function formatarNome(nome)
     return nome:sub(1,1):upper() .. nome:sub(2)
 end
 
--- CLASSE PRINCIPAL DO LOADER (MODIFICADA - SEM VERIFICAÇÃO DE CHAVE)
+-- CLASSE PRINCIPAL
 local Loader = {}
 Loader.__index = Loader
 
 function Loader.new()
     local gui = obterGui()
-    local existente = gui and gui:FindFirstChild("CerberusLoaderGui")
-    if existente then existente:Destroy() end
+    
+    -- Remove UI existente
+    pcall(function()
+        if gui then
+            local existente = gui:FindFirstChild("CerberusLoaderGui")
+            if existente then existente:Destroy() end
+        end
+    end)
 
     local self = setmetatable({
         conexoes = {},
@@ -241,6 +349,7 @@ function Loader.new()
         DisplayOrder = 999999
     })
     
+    -- Tenta proteger a GUI
     pcall(function()
         if syn and syn.protect_gui then
             syn.protect_gui(screenGui)
@@ -249,7 +358,35 @@ function Loader.new()
         end
     end)
     
-    screenGui.Parent = gui
+    -- Define o parente
+    if gui then
+        screenGui.Parent = gui
+    else
+        -- Fallback extremo
+        pcall(function()
+            screenGui.Parent = game:GetService("CoreGui")
+        end)
+        if not screenGui.Parent then
+            pcall(function()
+                local player = c.LocalPlayer
+                if player then
+                    local playerGui = player:FindFirstChildOfClass("PlayerGui")
+                    if playerGui then
+                        screenGui.Parent = playerGui
+                    end
+                end
+            end)
+        end
+    end
+    
+    -- Se ainda não tiver parente, cria um CoreGui novo
+    if not screenGui.Parent then
+        local novoGui = Instance.new("ScreenGui")
+        novoGui.Name = "CerberusLoaderGui"
+        novoGui.Parent = game:GetService("CoreGui")
+        screenGui = novoGui
+    end
+    
     self.gui = screenGui
 
     -- Container principal
@@ -310,7 +447,7 @@ function Loader.new()
     })
     gradiente(titulo, i.accent, i.accentHi, 90)
 
-    -- Pill "FREE" (modificado)
+    -- Pill "FREE"
     local pillWrap = q("Frame", {
         BackgroundColor3 = i.accent,
         Position = UDim2.fromOffset(140, 20),
@@ -373,7 +510,7 @@ function Loader.new()
         Parent = win
     })
 
-    -- Ícone central (logo)
+    -- Ícone central
     local iconWrap = q("Frame", {
         BackgroundColor3 = i.accent,
         BackgroundTransparency = 0.86,
@@ -418,7 +555,7 @@ function Loader.new()
     })
     self.title = mainTitle
 
-    -- Corpo do texto (rolável)
+    -- Corpo do texto
     local scroll = q("ScrollingFrame", {
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
@@ -509,7 +646,7 @@ function Loader.new()
     
     self.statusRow, self.statusDot, self.statusLbl = statusRow, statusDot, statusLbl
 
-    -- Botões (linha)
+    -- Botões
     local btnRow = q("Frame", {
         BackgroundTransparency = 1,
         Visible = false,
@@ -528,7 +665,6 @@ function Loader.new()
     })
     self.btnRow = btnRow
 
-    -- Inicializar
     self:entrar()
     self:arrastar()
     self:teclas()
@@ -537,8 +673,7 @@ function Loader.new()
     return self
 end
 
--- MÉTODOS DA CLASSE (MODIFICADOS - SEM VERIFICAÇÃO DE CHAVE)
-
+-- MÉTODOS DA CLASSE
 function Loader:track(conexao)
     table.insert(self.conexoes, conexao)
     return conexao
@@ -780,8 +915,7 @@ function Loader:destroy()
     end
 end
 
--- FUNÇÕES DE CARREGAMENTO (MODIFICADAS - SEM VERIFICAÇÃO)
-
+-- FUNÇÕES DE CARREGAMENTO
 local function copiar(texto)
     if setclipboard then
         setclipboard(texto)
@@ -801,7 +935,6 @@ local function obterScript(url, semCache)
         return conteudo
     end
     
-    -- Fallback para outras APIs
     local requisicao = (type(request) == "function" and request) or
                       (type(http_request) == "function" and http_request) or
                       (type(syn) == "table" and type(syn.request) == "function" and syn.request)
@@ -897,8 +1030,7 @@ local function carregarScript(url, nome, semCache)
     end)
 end
 
--- INÍCIO DO SCRIPT (MODIFICADO - SEM VERIFICAÇÃO DE CHAVE)
-
+-- INÍCIO DO SCRIPT
 local loaderInstance = Loader.new()
 local loader = loaderInstance
 
@@ -935,7 +1067,6 @@ task.spawn(function()
     local nomeFormatado = formatarNome(scriptName)
     local nomeArquivo = scriptName
     
-    -- Verifica variação
     local variacao = _G.VARIANT
     if type(variacao) == "string" and variacao ~= "" then
         nomeArquivo = nomeArquivo:gsub("%.lua$", "") .. "." .. variacao .. ".lua"
@@ -950,35 +1081,16 @@ task.spawn(function()
     loader:progresso(0.25)
     task.wait(0.3)
     
-    -- Verifica se é script gratuito
-    local isFree = k[scriptName] == true
-    local allowNoKey = _G.CERBERUS_ALLOW_NO_KEY
-    
-    if isFree then
-        loader:modo("FREE", i.accent)
-        loader:definir({
-            status = "Sem chave necessária",
-            statusDot = i.accent
-        })
-    elseif allowNoKey then
-        loader:modo("NO-KEY", i.amber)
-        loader:definir({
-            status = "Verificação de chave ignorada",
-            statusDot = i.amber
-        })
-    else
-        -- 🔥 MUDANÇA PRINCIPAL: SEMPRE LIBERA O SCRIPT 🔥
-        loader:modo("FREE", i.accent)
-        loader:definir({
-            status = "✅ Premium desbloqueado",
-            statusDot = i.accent
-        })
-    end
+    -- SEMPRE LIVRE - Premium desbloqueado
+    loader:modo("FREE", i.accent)
+    loader:definir({
+        status = "✅ Premium desbloqueado",
+        statusDot = i.accent
+    })
     
     loader:progresso(0.6)
     task.wait(0.2)
     
-    -- Carrega o script
     local url = e .. nomeArquivo
     carregarScript(url, nomeFormatado, true)
 end)
