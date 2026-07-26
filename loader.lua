@@ -1,6 +1,6 @@
 --[[
-    Cerberus Loader - Versão Livre (UI Recriada)
-    Sistema próprio de carregamento, sem travas
+    Cerberus Loader - Versão Livre (com Patch Premium)
+    Força todas as opções premium a ficarem liberadas
 ]]
 
 -- ===== CONFIGURAÇÕES =====
@@ -108,6 +108,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
 
 -- ===== FUNÇÕES AUXILIARES =====
 local function criar(className, props)
@@ -191,6 +192,95 @@ local function obterGUI()
         end)
     end
     return newGui
+end
+
+-- ===== PATCH PREMIUM =====
+-- Função que será injetada no script para burlar verificações
+local function aplicarPatch()
+    -- Aguarda o script carregar e tenta patch
+    local tentativas = 0
+    local function patchLoop()
+        tentativas = tentativas + 1
+        if tentativas > 50 then return end
+        
+        -- Procura por objetos que indicam que o menu Cerberus está ativo
+        local cerberusGui = nil
+        pcall(function()
+            for _, gui in ipairs(CoreGui:GetChildren()) do
+                if gui:IsA("ScreenGui") and (gui.Name:find("Cerberus") or gui.Name:find("cerberus") or gui.Name:find("Cérbero")) then
+                    cerberusGui = gui
+                    break
+                end
+            end
+        end)
+        
+        if cerberusGui then
+            -- Tenta encontrar e modificar verificações de premium
+            pcall(function()
+                -- Procura por botões/opções premium e os libera
+                for _, child in ipairs(cerberusGui:GetDescendants()) do
+                    if child:IsA("TextButton") or child:IsA("ImageButton") then
+                        -- Libera botões que parecem premium
+                        if child.Text and (child.Text:find("Premium") or child.Text:find("premium") or
+                           child.Text:find("Paga") or child.Text:find("paga") or
+                           child.Text:find("VIP") or child.Text:find("vip")) then
+                            child.Visible = true
+                            child.Active = true
+                            child.Selectable = true
+                            child.AutoButtonColor = true
+                            child.BackgroundTransparency = 0.7
+                        end
+                    end
+                    
+                    -- Remove telas de bloqueio premium
+                    if child:IsA("Frame") and child.Visible and child:FindFirstChild("TextLabel") then
+                        local text = child:FindFirstChildOfClass("TextLabel")
+                        if text and text.Text and (text.Text:find("premium") or text.Text:find("Premium") or
+                           text.Text:find("key") or text.Text:find("Key") or
+                           text.Text:find("pricing") or text.Text:find("Pricing")) then
+                            child.Visible = false
+                            child:Destroy()
+                        end
+                    end
+                end
+            end)
+            
+            -- Tenta modificar variáveis globais
+            pcall(function()
+                if _G.Cerberus then
+                    if type(_G.Cerberus) == "table" then
+                        _G.Cerberus.Premium = true
+                        _G.Cerberus.HasKey = true
+                        _G.Cerberus.Unlocked = true
+                    end
+                end
+                if _G.cerberus then
+                    if type(_G.cerberus) == "table" then
+                        _G.cerberus.Premium = true
+                        _G.cerberus.HasKey = true
+                        _G.cerberus.Unlocked = true
+                    end
+                end
+                if _G.CerberusSettings then
+                    _G.CerberusSettings.Premium = true
+                    _G.CerberusSettings.Unlocked = true
+                end
+            end)
+        end
+        
+        task.wait(0.5)
+        if cerberusGui then
+            -- Se encontrou o menu, continua monitorando
+            task.spawn(patchLoop)
+        else
+            -- Se não encontrou, tenta novamente
+            task.wait(1)
+            task.spawn(patchLoop)
+        end
+    end
+    
+    -- Inicia o patch
+    task.spawn(patchLoop)
 end
 
 -- ===== CLASSE LOADER =====
@@ -300,7 +390,7 @@ function Loader.new()
     local pillStroke = stroke(pillWrap, CORES.accent, 0.25)
     
     local pillLbl = label({
-        Text = "FREE",
+        Text = "PREMIUM",
         FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.SemiBold),
         TextSize = 10,
         TextColor3 = CORES.accentDk,
@@ -384,7 +474,7 @@ function Loader.new()
     })
     
     local body = label({
-        Text = "Carregando...",
+        Text = "Carregando... (Patch Premium Ativo)",
         TextSize = 14,
         TextColor3 = CORES.subtext,
         TextWrapped = true,
@@ -618,6 +708,81 @@ local function getScript(url, nocache)
     return nil
 end
 
+-- ===== PATCH QUE É INJETADO NO SCRIPT =====
+local function gerarPatchScript()
+    return [[
+        -- PATCH PREMIUM INJETADO
+        local function patchPremium()
+            -- Libera variáveis globais
+            _G.Cerberus = _G.Cerberus or {}
+            _G.Cerberus.Premium = true
+            _G.Cerberus.HasKey = true
+            _G.Cerberus.Unlocked = true
+            _G.Cerberus.Key = "FREE_PREMIUM"
+            
+            _G.cerberus = _G.cerberus or {}
+            _G.cerberus.Premium = true
+            _G.cerberus.HasKey = true
+            _G.cerberus.Unlocked = true
+            
+            -- Tenta patch no jogo
+            pcall(function()
+                for _, v in pairs(getgc(true)) do
+                    if type(v) == "table" then
+                        if v.Premium ~= nil then v.Premium = true end
+                        if v.HasKey ~= nil then v.HasKey = true end
+                        if v.Unlocked ~= nil then v.Unlocked = true end
+                        if v.IsPremium ~= nil then v.IsPremium = true end
+                        if v.isPremium ~= nil then v.isPremium = true end
+                        if v.isKeyValid ~= nil then v.isKeyValid = true end
+                        if v.KeyValid ~= nil then v.KeyValid = true end
+                        if v.keyValid ~= nil then v.keyValid = true end
+                    end
+                end
+            end)
+            
+            -- Tenta patch na UI
+            pcall(function()
+                for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
+                    if gui:IsA("ScreenGui") then
+                        for _, child in ipairs(gui:GetDescendants()) do
+                            if child:IsA("TextLabel") and child.Text then
+                                if child.Text:find("premium") or child.Text:find("Premium") then
+                                    child.Text = child.Text:gsub("premium", "LIVRE"):gsub("Premium", "LIVRE")
+                                end
+                            end
+                            if child:IsA("TextButton") and child.Text then
+                                if child.Text:find("premium") or child.Text:find("Premium") then
+                                    child.Text = child.Text:gsub("premium", "LIVRE"):gsub("Premium", "LIVRE")
+                                end
+                            end
+                            if child:IsA("Frame") and child.Visible then
+                                if child:FindFirstChild("TextLabel") then
+                                    local txt = child:FindFirstChildOfClass("TextLabel")
+                                    if txt and txt.Text and (txt.Text:find("key") or txt.Text:find("Key") or
+                                       txt.Text:find("pricing") or txt.Text:find("Pricing")) then
+                                        child.Visible = false
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+            
+            print("[PATCH] Premium liberado com sucesso!")
+        end
+        
+        -- Executa o patch imediatamente e depois em loop
+        patchPremium()
+        task.spawn(function()
+            while task.wait(5) do
+                patchPremium()
+            end
+        end)
+    ]]
+end
+
 local function loadAndRun(loader, url, name, nocache)
     loader:setStatus("Carregando " .. name, CORES.accent)
     loader:setProgress(0.5)
@@ -632,7 +797,12 @@ local function loadAndRun(loader, url, name, nocache)
     end
     
     loader:setProgress(0.7)
-    local fn, err = loadstring(content)
+    
+    -- === INJETA O PATCH NO SCRIPT ===
+    local patchCode = gerarPatchScript()
+    local scriptCompleto = patchCode .. "\n\n-- Script original\n" .. content
+    
+    local fn, err = loadstring(scriptCompleto)
     if not fn then
         loader:showError("Erro no script",
             "O script não compilou.\n\n" .. tostring(err),
@@ -641,7 +811,7 @@ local function loadAndRun(loader, url, name, nocache)
         return
     end
     
-    loader:setStatus("Carregado!", CORES.accent)
+    loader:setStatus("Carregado! (Premium Patch Ativo)", CORES.accent)
     loader:setProgress(1)
     task.wait(0.3)
     loader:fadeOut(function()
@@ -652,9 +822,9 @@ end
 -- ===== INÍCIO =====
 local loader = Loader.new()
 loader:setTitle("Iniciando")
-loader:setBody("Preparando Cerberus...")
+loader:setBody("Preparando Cerberus com Patch Premium...")
 loader:setStatus("Detectando jogo", CORES.accent)
-loader:setPill("FREE", CORES.accent)
+loader:setPill("PREMIUM", CORES.accent)
 
 task.spawn(function()
     task.wait(0.35)
@@ -677,14 +847,14 @@ task.spawn(function()
     
     local formatted = formatarNome(scriptName)
     loader:setTitle(formatted)
-    loader:setBody("Script dedicado encontrado para este jogo.")
+    loader:setBody("Script dedicado encontrado. Patch Premium será aplicado.")
     loader:setStatus("Jogo detectado", CORES.accent)
     loader:setProgress(0.3)
     task.wait(0.3)
     
-    -- Sempre livre
-    loader:setPill("FREE", CORES.accent)
-    loader:setStatus("✅ Premium desbloqueado", CORES.accent)
+    -- Sempre premium
+    loader:setPill("PREMIUM", CORES.accent)
+    loader:setStatus("✅ Premium liberado via patch", CORES.accent)
     loader:setProgress(0.6)
     task.wait(0.2)
     
